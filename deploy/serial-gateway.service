@@ -1,0 +1,23 @@
+[Unit]
+Description=AI Shared Serial Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=serial-gateway
+Group=dialout
+SupplementaryGroups=dialout
+WorkingDirectory=/opt/serial-gateway
+EnvironmentFile=-/etc/serial-gateway.env
+Environment=SERIAL_GATEWAY_DATA=/var/lib/serial-gateway
+ExecStart=/opt/serial-gateway/.venv/bin/python -m serial_gateway
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/serial-gateway
+
+[Install]
+WantedBy=multi-user.target

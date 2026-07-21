@@ -1,0 +1,1 @@
+"""AI shared serial gateway."""
