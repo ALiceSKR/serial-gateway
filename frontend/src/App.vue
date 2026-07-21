@@ -88,7 +88,6 @@ function connectSocket() {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
   socket = new WebSocket(`${scheme}://${location.host}/ws/terminal`)
   socket.onopen = () => {
-    writeNotice(`已连接 ${selected.value.name || selectedId.value}，点击终端后可直接操作`)
     xterm?.focus()
   }
   socket.onmessage = ({ data }) => {
@@ -97,12 +96,6 @@ function connectSocket() {
     let output = ''
     if (event.source === 'UART RX') {
       output = event.data
-    } else if (event.source === 'ERROR') {
-      output = `\r\n\x1b[31m[错误] ${event.data}\x1b[0m\r\n`
-    } else if (event.source === 'AI TX') {
-      output = `\r\n\x1b[36m[AI 发送] ${event.data.replace(/\r?\n$/, '')}\x1b[0m\r\n`
-    } else if (event.source === 'SYSTEM' && event.port_id !== '*') {
-      output = `\r\n\x1b[90m— ${event.data} —\x1b[0m\r\n`
     }
     if (output) appendTerminal(portId, output)
   }
@@ -149,10 +142,6 @@ function appendTerminal(portId, data) {
   const combined = existing + data
   terminalHistory.set(portId, combined.length > 1_000_000 ? combined.slice(-800_000) : combined)
   if (portId === selectedId.value) xterm?.write(data)
-}
-
-function writeNotice(message) {
-  appendTerminal(selectedId.value, `\r\n\x1b[90m— ${message} —\x1b[0m\r\n`)
 }
 
 function clearTerminal() {
@@ -266,7 +255,6 @@ watch(selectedId, async (newId, oldId) => {
   xterm.reset()
   const history = terminalHistory.get(newId)
   if (history) xterm.write(history)
-  else writeNotice(`已切换到 ${selected.value.name || newId}`)
   await nextTick()
   fitAddon?.fit()
   xterm.focus()

@@ -28,7 +28,7 @@ def test_subnegotiation_is_removed():
     assert decoder.feed(data) == b"pwd\r"
 
 
-def test_web_input_is_not_annotated_to_telnet_clients():
+def test_only_uart_output_is_sent_to_telnet_clients():
     class Writer:
         def __init__(self):
             self.data = bytearray()
@@ -43,7 +43,10 @@ def test_web_input_is_not_annotated_to_telnet_clients():
         server = TelnetServer(lambda *_: None)
         writer = Writer()
         server.clients.add(writer)
-        await server.broadcast({"source": "WEB TX", "data": "\r"})
+        for source in ("WEB TX", "AI TX", "HUMAN TX", "SYSTEM", "ERROR"):
+            await server.broadcast({"source": source, "data": "hidden"})
         assert writer.data == b""
+        await server.broadcast({"source": "UART RX", "data": "root@host:~# "})
+        assert writer.data == b"root@host:~# "
 
     asyncio.run(run())

@@ -95,9 +95,7 @@ class TelnetServer:
     async def broadcast(self, event: dict) -> None:
         source = event["source"]
         data = self._telnet_newlines(event["data"])
-        if source in {"AI TX", "SYSTEM", "ERROR"}:
-            payload = f"\r\n[{source}]\r\n{data}".encode()
-        elif source == "UART RX":
+        if source == "UART RX":
             payload = data.encode()
         else:
             return
