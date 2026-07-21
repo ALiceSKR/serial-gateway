@@ -38,6 +38,8 @@ async function api(path, options = {}) {
     ...options,
   })
   if (response.status === 401) {
+    disconnectSocket()
+    destroyTerminal()
     user.value = null
     throw new Error('请重新登录')
   }
@@ -64,6 +66,7 @@ async function login() {
 async function logout() {
   await api('/api/logout', { method: 'POST' }).catch(() => {})
   disconnectSocket()
+  destroyTerminal()
   user.value = null
 }
 
@@ -157,6 +160,15 @@ function disconnectSocket() {
     socket = null
   }
   clearInterval(statusTimer)
+}
+
+function destroyTerminal() {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  xterm?.dispose()
+  xterm = null
+  fitAddon = null
+  terminalHistory.clear()
 }
 
 async function persistPorts(ports) {
@@ -262,8 +274,7 @@ watch(selectedId, async (newId, oldId) => {
 
 onBeforeUnmount(() => {
   disconnectSocket()
-  resizeObserver?.disconnect()
-  xterm?.dispose()
+  destroyTerminal()
 })
 </script>
 
