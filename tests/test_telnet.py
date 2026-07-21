@@ -1,3 +1,5 @@
+import asyncio
+
 from serial_gateway.telnet import TelnetDecoder, TelnetServer
 
 
@@ -24,3 +26,24 @@ def test_subnegotiation_is_removed():
     decoder = TelnetDecoder()
     data = bytes([255, 250, 31, 0, 80, 0, 24, 255, 240]) + b"pwd\r"
     assert decoder.feed(data) == b"pwd\r"
+
+
+def test_web_input_is_not_annotated_to_telnet_clients():
+    class Writer:
+        def __init__(self):
+            self.data = bytearray()
+
+        def write(self, data):
+            self.data.extend(data)
+
+        async def drain(self):
+            pass
+
+    async def run():
+        server = TelnetServer(lambda *_: None)
+        writer = Writer()
+        server.clients.add(writer)
+        await server.broadcast({"source": "WEB TX", "data": "\r"})
+        assert writer.data == b""
+
+    asyncio.run(run())
