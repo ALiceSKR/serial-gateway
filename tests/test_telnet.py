@@ -12,10 +12,6 @@ def test_escaped_iac_is_preserved():
     assert TelnetServer._strip_negotiation(bytes([255, 255])) == bytes([255])
 
 
-def test_telnet_newlines_are_normalized():
-    assert TelnetServer._telnet_newlines("a\nb\r\nc\r") == "a\r\nb\r\nc\r\n"
-
-
 def test_negotiation_split_across_tcp_reads():
     decoder = TelnetDecoder()
     assert decoder.feed(b"ls" + bytes([255, 253])) == b"ls"
@@ -46,7 +42,8 @@ def test_only_uart_output_is_sent_to_telnet_clients():
         for source in ("WEB TX", "AI TX", "HUMAN TX", "SYSTEM", "ERROR"):
             await server.broadcast({"source": source, "data": "hidden"})
         assert writer.data == b""
-        await server.broadcast({"source": "UART RX", "data": "root@host:~# "})
-        assert writer.data == b"root@host:~# "
+        output = "Update full flash image ... 53%\rUpdate full flash image ... 54%"
+        await server.broadcast({"source": "UART RX", "data": output})
+        assert writer.data == output.encode()
 
     asyncio.run(run())

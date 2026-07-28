@@ -94,9 +94,8 @@ class TelnetServer:
 
     async def broadcast(self, event: dict) -> None:
         source = event["source"]
-        data = self._telnet_newlines(event["data"])
         if source == "UART RX":
-            payload = data.encode()
+            payload = event["data"].encode()
         else:
             return
         dead = []
@@ -108,7 +107,3 @@ class TelnetServer:
                 dead.append(writer)
         for writer in dead:
             self.clients.discard(writer)
-
-    @staticmethod
-    def _telnet_newlines(data: str) -> str:
-        return data.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
