@@ -1,4 +1,5 @@
 import asyncio
+import socket
 from collections.abc import Awaitable, Callable
 
 
@@ -38,6 +39,7 @@ class TelnetDecoder:
 
 class TelnetServer:
     IAC = 255
+    NOP = 241
     DO = 253
     DONT = 254
     WILL = 251
@@ -62,6 +64,7 @@ class TelnetServer:
         self.clients.clear()
 
     async def _client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self._configure_keepalive(writer)
         self.clients.add(writer)
         writer.write(
             bytes(
@@ -76,6 +79,7 @@ class TelnetServer:
         writer.write(b"\r\nSerial Gateway connected.\r\n")
         await writer.drain()
         decoder = TelnetDecoder()
+        heartbeat = asyncio.create_task(self._heartbeat(writer))
         try:
             while data := await reader.read(4096):
                 clean = decoder.feed(data)
@@ -84,9 +88,37 @@ class TelnetServer:
         except (ConnectionError, RuntimeError):
             pass
         finally:
+            heartbeat.cancel()
+            await asyncio.gather(heartbeat, return_exceptions=True)
             self.clients.discard(writer)
             writer.close()
             await writer.wait_closed()
+
+    @staticmethod
+    def _configure_keepalive(writer: asyncio.StreamWriter) -> None:
+        sock = writer.get_extra_info("socket")
+        if sock is None:
+            return
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        options = (
+            ("TCP_KEEPIDLE", 30),
+            ("TCP_KEEPINTVL", 10),
+            ("TCP_KEEPCNT", 3),
+            ("TCP_USER_TIMEOUT", 30_000),
+        )
+        for name, value in options:
+            option = getattr(socket, name, None)
+            if option is not None:
+                sock.setsockopt(socket.IPPROTO_TCP, option, value)
+
+    async def _heartbeat(self, writer: asyncio.StreamWriter) -> None:
+        try:
+            while not writer.is_closing():
+                await asyncio.sleep(20)
+                writer.write(bytes([self.IAC, self.NOP]))
+                await asyncio.wait_for(writer.drain(), timeout=5)
+        except (ConnectionError, OSError, asyncio.TimeoutError):
+            writer.close()
 
     @classmethod
     def _strip_negotiation(cls, data: bytes) -> bytes:
@@ -102,8 +134,9 @@ class TelnetServer:
         for writer in tuple(self.clients):
             try:
                 writer.write(payload)
-                await writer.drain()
-            except ConnectionError:
+                await asyncio.wait_for(writer.drain(), timeout=5)
+            except (ConnectionError, OSError, asyncio.TimeoutError):
                 dead.append(writer)
         for writer in dead:
             self.clients.discard(writer)
+            writer.close()
