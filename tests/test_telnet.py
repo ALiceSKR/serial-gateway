@@ -1,12 +1,47 @@
 import asyncio
 import socket
 
+import pytest
+
 from serial_gateway.telnet import TelnetDecoder, TelnetServer
 
 
 def test_strips_telnet_negotiation_and_keeps_text():
     data = bytes([255, 253, 3]) + b"printenv\r\n"
-    assert TelnetServer._strip_negotiation(data) == b"printenv\r\n"
+    assert TelnetServer._strip_negotiation(data) == b"printenv\r"
+
+
+@pytest.mark.parametrize("ending", [b"\r\x00", b"\r\n", b"\r", b"\n"])
+def test_console_enter_across_every_tcp_split(ending):
+    data = b"fdisk /dev/sda" + ending + b"q" + ending
+    expected_ending = b"\n" if ending == b"\n" else b"\r"
+    expected = b"fdisk /dev/sda" + expected_ending + b"q" + expected_ending
+    for split in range(len(data) + 1):
+        decoder = TelnetDecoder()
+        assert decoder.feed(data[:split]) + decoder.feed(data[split:]) == expected
+    decoder = TelnetDecoder()
+    assert b"".join(decoder.feed(bytes([byte])) for byte in data) == expected
+
+
+@pytest.mark.parametrize("companion", [b"\x00", b"\n"])
+def test_enter_companion_after_interleaved_negotiation(companion):
+    decoder = TelnetDecoder()
+    assert decoder.feed(b"sudo ls\r") == b"sudo ls\r"
+    assert decoder.feed(bytes([255, 253])) == b""
+    assert decoder.feed(bytes([3, 255, 241]) + companion) == b""
+    assert decoder.feed(b"response\r" + companion) == b"response\r"
+
+
+def test_preserves_console_controls_and_repeated_enter():
+    data = b"\x00\x03\x04\t\x1b[A\x7f\r\r\n\n\r\x00\x00"
+    assert TelnetDecoder().feed(data) == b"\x00\x03\x04\t\x1b[A\x7f\r\r\n\r\x00"
+
+
+def test_cr_state_is_per_connection():
+    first, second = TelnetDecoder(), TelnetDecoder()
+    assert first.feed(b"\r") == b"\r"
+    assert second.feed(b"\n\x00") == b"\n\x00"
+    assert first.feed(b"\x00") == b""
 
 
 def test_escaped_iac_is_preserved():

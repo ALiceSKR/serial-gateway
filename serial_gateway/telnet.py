@@ -4,10 +4,11 @@ from collections.abc import Awaitable, Callable
 
 
 class TelnetDecoder:
-    """Remove Telnet commands while preserving a byte stream across TCP reads."""
+    """Decode Telnet commands and NVT input for an interactive serial console."""
 
     def __init__(self) -> None:
         self.state = "data"
+        self.after_cr = False
 
     def feed(self, data: bytes) -> bytes:
         result = bytearray()
@@ -34,7 +35,18 @@ class TelnetDecoder:
                     self.state = "sub_iac"
             elif self.state == "sub_iac":
                 self.state = "data" if byte == 240 else "subnegotiation"
-        return bytes(result)
+        # No BINARY option is negotiated: RFC 854 encodes Enter as CR LF
+        # or CR NUL. Forward CR immediately, then consume its companion even
+        # across TCP reads or intervening Telnet commands. Passing NUL to the
+        # console can terminate password readers and other interactive tools.
+        clean = bytearray()
+        for byte in result:
+            if self.after_cr and byte in {0, 10}:
+                self.after_cr = False
+                continue
+            clean.append(byte)
+            self.after_cr = byte == 13
+        return bytes(clean)
 
 
 class TelnetServer:
