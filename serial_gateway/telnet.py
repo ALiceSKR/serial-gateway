@@ -1,4 +1,5 @@
 import asyncio
+import codecs
 import socket
 from collections.abc import Awaitable, Callable
 
@@ -91,12 +92,14 @@ class TelnetServer:
         writer.write(b"\r\nSerial Gateway connected.\r\n")
         await writer.drain()
         decoder = TelnetDecoder()
+        text_decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         heartbeat = asyncio.create_task(self._heartbeat(writer))
         try:
             while data := await reader.read(4096):
                 clean = decoder.feed(data)
-                if clean:
-                    await self.send_serial(clean.decode("utf-8", errors="replace"), "HUMAN TX")
+                text = text_decoder.decode(clean)
+                if text:
+                    await self.send_serial(text, "HUMAN TX")
         except (ConnectionError, RuntimeError):
             pass
         finally:

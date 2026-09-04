@@ -105,3 +105,42 @@ def test_only_uart_output_is_sent_to_telnet_clients():
         assert writer.data == output.encode()
 
     asyncio.run(run())
+
+
+def test_client_utf8_survives_tcp_and_negotiation_boundaries():
+    class Reader:
+        def __init__(self):
+            self.chunks = iter([b'\xe4', bytes([255, 241]), b'\xb8', b'\xad\r', b'\x00', b''])
+
+        async def read(self, size):
+            return next(self.chunks)
+
+    class Writer:
+        def get_extra_info(self, name):
+            return None
+
+        def write(self, data):
+            pass
+
+        async def drain(self):
+            pass
+
+        def is_closing(self):
+            return False
+
+        def close(self):
+            pass
+
+        async def wait_closed(self):
+            pass
+
+    async def run():
+        received = []
+
+        async def send(data, source):
+            received.append(data)
+
+        await TelnetServer(send)._client(Reader(), Writer())
+        assert ''.join(received) == '中\r'
+
+    asyncio.run(run())

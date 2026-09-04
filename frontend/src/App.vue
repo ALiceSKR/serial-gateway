@@ -311,26 +311,28 @@ onBeforeUnmount(() => {
       <button class="add-channel" @click="openManager">＋ 管理通道</button>
     </nav>
 
-    <section class="overview">
-      <div><span class="label">ACTIVE DEVICE</span><strong>{{ selected.device }}</strong></div>
-      <div><span class="label">SERIAL FORMAT</span><strong>{{ selected.baudrate }} · {{ selected.bytesize }}{{ selected.parity }}{{ selected.stopbits }}</strong></div>
-      <div><span class="label">TELNET ENDPOINT</span><strong>{{ hostname }}:{{ selected.telnet_port }}</strong></div>
-      <div><span class="label">CONNECTED CLIENTS</span><strong>{{ currentStatus.telnet_clients || 0 }} Telnet · 1 Web</strong></div>
-    </section>
+    <div class="workspace">
+      <section class="overview">
+        <div><span class="label">ACTIVE DEVICE</span><strong>{{ selected.device }}</strong></div>
+        <div><span class="label">SERIAL FORMAT</span><strong>{{ selected.baudrate }} · {{ selected.bytesize }}{{ selected.parity }}{{ selected.stopbits }}</strong></div>
+        <div><span class="label">TELNET ENDPOINT</span><strong>{{ hostname }}:{{ selected.telnet_port }}</strong></div>
+        <div><span class="label">CONNECTED CLIENTS</span><strong>{{ currentStatus.telnet_clients || 0 }} Telnet · 1 Web</strong></div>
+      </section>
 
-    <section class="console-card">
-      <div class="console-head">
-        <div><span class="window-dot red"></span><span class="window-dot amber"></span><span class="window-dot green"></span><b>INTERACTIVE LINUX CONSOLE</b></div>
-        <div class="terminal-actions">
-          <span>点击终端直接输入 · 支持 Tab / Ctrl+C / 方向键</span>
-          <button :class="['port-power', currentStatus.enabled ? 'close-port' : 'open-port']" :disabled="busy" @click="toggleCurrentPort">{{ currentStatus.enabled ? '关闭串口' : '打开串口' }}</button>
-          <button class="text-button" @click="clearTerminal">清屏</button>
+      <section class="console-card">
+        <div class="console-head">
+          <div><span class="window-dot red"></span><span class="window-dot amber"></span><span class="window-dot green"></span><b>INTERACTIVE LINUX CONSOLE</b></div>
+          <div class="terminal-actions">
+            <span>点击终端直接输入 · 支持 Tab / Ctrl+C / 方向键</span>
+            <button :class="['port-power', currentStatus.enabled ? 'close-port' : 'open-port']" :disabled="busy" @click="toggleCurrentPort">{{ currentStatus.enabled ? '关闭串口' : '打开串口' }}</button>
+            <button class="text-button" @click="clearTerminal">清屏</button>
+          </div>
         </div>
-      </div>
-      <div class="terminal" @click="xterm?.focus()">
-        <div ref="terminalHost" class="xterm-host"></div>
-      </div>
-    </section>
+        <div class="terminal" @click="xterm?.focus()">
+          <div ref="terminalHost" class="xterm-host"></div>
+        </div>
+      </section>
+    </div>
     <p v-if="currentStatus.last_error" class="status-error">{{ currentStatus.last_error }}</p>
 
     <div v-if="settingsOpen" class="modal-backdrop" @click.self="settingsOpen = false">

@@ -1,4 +1,5 @@
 import asyncio
+import codecs
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -64,20 +65,20 @@ class SerialGateway:
 
     async def _read_loop(self) -> None:
         assert self.serial is not None
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
         while True:
             try:
                 data = await asyncio.to_thread(self.serial.read, 4096)
                 if data:
-                    try:
-                        decoded = data.decode("utf-8")
-                    except UnicodeDecodeError:
+                    decoded = decoder.decode(data)
+                    if "\ufffd" in decoded:
                         self.logger.warning(
                             "[%s RAW HEX] %s",
                             self.settings.id,
                             data.hex(" "),
                         )
-                        decoded = data.decode("utf-8", errors="replace")
-                    await self.emit("UART RX", decoded)
+                    if decoded:
+                        await self.emit("UART RX", decoded)
             except (SerialException, OSError) as exc:
                 self.last_error = str(exc)
                 await self.emit("ERROR", f"串口读取失败：{exc}")
