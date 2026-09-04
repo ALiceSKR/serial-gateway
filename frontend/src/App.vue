@@ -327,7 +327,9 @@ onBeforeUnmount(() => {
           <button class="text-button" @click="clearTerminal">清屏</button>
         </div>
       </div>
-      <div ref="terminalHost" class="terminal xterm-host" @click="xterm?.focus()"></div>
+      <div class="terminal" @click="xterm?.focus()">
+        <div ref="terminalHost" class="xterm-host"></div>
+      </div>
     </section>
     <p v-if="currentStatus.last_error" class="status-error">{{ currentStatus.last_error }}</p>
 

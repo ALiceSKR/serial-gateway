@@ -54,6 +54,7 @@ header { height: 72px; display: flex; align-items: center; justify-content: spac
 .terminal-actions { display: flex; align-items: center; gap: 14px; color: #49665c; font: 10px 'IBM Plex Mono', monospace; }
 .port-power { border: 1px solid; padding: 6px 10px; background: transparent; font: 10px 'IBM Plex Mono', monospace; white-space: nowrap; }.port-power:disabled { opacity: .5; }.open-port { border-color: #55e6ad; color: #55e6ad; }.close-port { border-color: #a65c57; color: #e57a73; }
 .terminal { height: min(62vh, 680px); overflow: hidden; padding: 14px 12px; background: #07110e; }
+.xterm-host { height: 100%; min-width: 0; }
 .xterm-host .xterm { height: 100%; }.xterm-host .xterm-viewport { scrollbar-color: #29483d #07110e; }.xterm-host .xterm-screen { cursor: text; }
 .terminal-empty { color: #39564d; }
 .event-line { display: grid; grid-template-columns: 70px 95px 1fr; min-height: 20px; }
