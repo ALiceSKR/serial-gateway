@@ -34,6 +34,8 @@ class SerialSettings(BaseModel):
 class PortConfig(SerialSettings):
     id: str = Field(pattern=r"^[a-zA-Z0-9_-]+$", min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=64)
+    network_protocol: Literal["telnet", "raw_tcp"] = "telnet"
+    usr_vcom_sync: bool = False
     telnet_port: int = Field(ge=1024, le=65535)
 
 
@@ -50,7 +52,7 @@ class GatewayConfig(BaseModel):
         if len(devices) != len(set(devices)):
             raise ValueError("真实串口设备不能重复")
         if len(telnet_ports) != len(set(telnet_ports)):
-            raise ValueError("Telnet 端口不能重复")
+            raise ValueError("网络端口不能重复")
         return self
 
 

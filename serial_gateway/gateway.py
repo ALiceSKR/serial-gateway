@@ -10,12 +10,16 @@ from serial import SerialException
 from .models import PortConfig
 
 EventSink = Callable[[dict], Awaitable[None]]
+ByteSink = Callable[[bytes], Awaitable[None]]
 
 
 class SerialGateway:
-    def __init__(self, settings: PortConfig, event_sink: EventSink) -> None:
+    def __init__(
+        self, settings: PortConfig, event_sink: EventSink, byte_sink: ByteSink | None = None
+    ) -> None:
         self.settings = settings
         self.event_sink = event_sink
+        self.byte_sink = byte_sink
         self.serial: serial.Serial | None = None
         self.reader_task: asyncio.Task | None = None
         self.write_lock = asyncio.Lock()
@@ -70,6 +74,8 @@ class SerialGateway:
             try:
                 data = await asyncio.to_thread(self.serial.read, 4096)
                 if data:
+                    if self.byte_sink:
+                        await self.byte_sink(data)
                     decoded = decoder.decode(data)
                     if "\ufffd" in decoded:
                         self.logger.warning(
@@ -85,20 +91,53 @@ class SerialGateway:
                 return
 
     async def send(self, data: str, source: str) -> None:
-        encoded = data.encode("utf-8")
+        await self.send_bytes(data.encode("utf-8"), source)
+
+    async def send_bytes(self, data: bytes, source: str) -> None:
+        display = data.decode("utf-8", errors="replace")
         async with self.write_lock:
             if not self.settings.enabled:
                 raise RuntimeError("串口已关闭")
             if self.settings.simulated:
-                await self.emit(source, data)
+                await self.emit(source, display)
                 await asyncio.sleep(0.03)
-                await self.emit("UART RX", f"[模拟设备响应] {data}")
+                response = b"[simulated response] " + data
+                if self.byte_sink:
+                    await self.byte_sink(response)
+                await self.emit("UART RX", response.decode("utf-8", errors="replace"))
                 return
             if not self.serial or not self.serial.is_open:
                 raise RuntimeError(self.last_error or "串口未连接")
-            await asyncio.to_thread(self.serial.write, encoded)
+            await asyncio.to_thread(self.serial.write, data)
             await asyncio.to_thread(self.serial.flush)
-            await self.emit(source, data)
+            await self.emit(source, display)
+
+    async def apply_serial_settings(
+        self, baudrate: int, bytesize: int, parity: str, stopbits: int
+    ) -> None:
+        """Apply settings received from a USR-VCOM virtual COM port."""
+        async with self.write_lock:
+            if not self.settings.enabled:
+                raise RuntimeError("串口已关闭")
+            if not self.settings.simulated and (not self.serial or not self.serial.is_open):
+                raise RuntimeError(self.last_error or "串口未连接")
+            if self.serial and self.serial.is_open:
+                def configure() -> None:
+                    assert self.serial is not None
+                    self.serial.baudrate = baudrate
+                    self.serial.bytesize = bytesize
+                    self.serial.parity = parity
+                    self.serial.stopbits = stopbits
+
+                await asyncio.to_thread(configure)
+            self.settings.baudrate = baudrate
+            self.settings.bytesize = bytesize
+            self.settings.parity = parity
+            self.settings.stopbits = stopbits
+        await self.emit(
+            "SYSTEM",
+            f"USR-VCOM 已同步串口参数：{baudrate} {bytesize}{parity}{stopbits}",
+        )
 
     async def emit(self, source: str, data: str) -> None:
         event = {

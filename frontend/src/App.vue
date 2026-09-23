@@ -214,7 +214,7 @@ function addPort() {
   let number = config.ports.length
   while (config.ports.some(port => port.id === `uart${number}`)) number++
   editingOriginalId.value = null
-  portDraft.value = { id: `uart${number}`, name: `UART ${number}`, device: devices.value[number]?.device || `/dev/ttyUSB${number}`, telnet_port: 2000 + number, baudrate: 115200, bytesize: 8, parity: 'N', stopbits: 1, simulated: false, enabled: true }
+  portDraft.value = { id: `uart${number}`, name: `UART ${number}`, device: devices.value[number]?.device || `/dev/ttyUSB${number}`, network_protocol: 'telnet', usr_vcom_sync: false, telnet_port: 2000 + number, baudrate: 115200, bytesize: 8, parity: 'N', stopbits: 1, simulated: false, enabled: true }
   managerView.value = 'edit'
 }
 
@@ -315,8 +315,8 @@ onBeforeUnmount(() => {
       <section class="overview">
         <div><span class="label">ACTIVE DEVICE</span><strong>{{ selected.device }}</strong></div>
         <div><span class="label">SERIAL FORMAT</span><strong>{{ selected.baudrate }} · {{ selected.bytesize }}{{ selected.parity }}{{ selected.stopbits }}</strong></div>
-        <div><span class="label">TELNET ENDPOINT</span><strong>{{ hostname }}:{{ selected.telnet_port }}</strong></div>
-        <div><span class="label">CONNECTED CLIENTS</span><strong>{{ currentStatus.telnet_clients || 0 }} Telnet · 1 Web</strong></div>
+        <div><span class="label">NETWORK ENDPOINT</span><strong>{{ hostname }}:{{ selected.telnet_port }} · {{ selected.network_protocol === 'raw_tcp' ? 'RAW TCP' : 'TELNET' }}</strong></div>
+        <div><span class="label">CONNECTED CLIENTS</span><strong>{{ currentStatus.telnet_clients || 0 }} {{ selected.network_protocol === 'raw_tcp' ? 'TCP' : 'Telnet' }} · 1 Web</strong></div>
       </section>
 
       <section class="console-card">
@@ -347,7 +347,7 @@ onBeforeUnmount(() => {
             <div v-for="port in config.ports" :key="port.id" :class="['channel-row', { deleting: deleteMode }]" role="button" tabindex="0" @click="editPort(port)" @keydown.enter="editPort(port)">
               <span :class="['channel-state', statuses.find(item => item.port_id === port.id)?.serial_connected ? 'connected' : '']"></span>
               <span class="channel-main"><strong>{{ port.name }}</strong><small>{{ port.device }} · {{ port.baudrate }} {{ port.bytesize }}{{ port.parity }}{{ port.stopbits }}</small></span>
-              <span class="channel-port">TELNET :{{ port.telnet_port }}</span>
+              <span class="channel-port">{{ port.network_protocol === 'raw_tcp' ? 'RAW TCP' : 'TELNET' }} :{{ port.telnet_port }}</span>
               <button v-if="deleteMode" type="button" class="row-delete" :disabled="config.ports.length === 1" @click.stop="deletePort(port)">删除</button>
               <span v-else class="row-edit">编辑 ›</span>
             </div>
@@ -368,7 +368,9 @@ onBeforeUnmount(() => {
                 <option v-for="item in devices" :key="item.device" :value="item.device">{{ item.display_name }}</option>
               </select>
             </label>
-            <label>Telnet 端口<input v-model.number="portDraft.telnet_port" type="number" min="1024" max="65535" /></label>
+            <label>网络模式<select v-model="portDraft.network_protocol"><option value="telnet">Telnet（SecureCRT）</option><option value="raw_tcp">裸 TCP（USR-VCOM）</option></select></label>
+            <label v-if="portDraft.network_protocol === 'raw_tcp'">串口参数同步<select v-model="portDraft.usr_vcom_sync"><option :value="false">关闭（纯透传）</option><option :value="true">有人类 RFC2217</option></select></label>
+            <label>网络端口<input v-model.number="portDraft.telnet_port" type="number" min="1024" max="65535" /></label>
             <label>波特率<select v-model.number="portDraft.baudrate"><option v-for="rate in baudrates" :key="rate" :value="rate">{{ rate }}</option></select></label>
             <label>数据位<select v-model.number="portDraft.bytesize"><option v-for="n in [5,6,7,8]" :key="n">{{ n }}</option></select></label>
             <label>校验位<select v-model="portDraft.parity"><option value="N">None</option><option value="E">Even</option><option value="O">Odd</option><option value="M">Mark</option><option value="S">Space</option></select></label>

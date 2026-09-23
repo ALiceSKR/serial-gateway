@@ -13,6 +13,7 @@ from .auth import require_user, sessions
 from .config import ConfigStore
 from .gateway import SerialGateway
 from .models import GatewayConfig, GatewayStatus, LoginRequest, SendRequest, SerialDevice
+from .raw_tcp import RawTcpServer
 from .telnet import TelnetServer
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,15 +32,15 @@ class Runtime:
         self.store = ConfigStore(DATA_DIR / "config.json")
         self.config = self.store.load()
         self.gateways: dict[str, SerialGateway] = {}
-        self.telnet: dict[str, TelnetServer] = {}
+        self.servers: dict[str, TelnetServer | RawTcpServer] = {}
 
     async def start(self) -> None:
         await self.apply_config(self.config, persist=False)
 
     async def stop(self) -> None:
-        await asyncio.gather(*(server.stop() for server in self.telnet.values()))
+        await asyncio.gather(*(server.stop() for server in self.servers.values()))
         await asyncio.gather(*(gateway.stop() for gateway in self.gateways.values()))
-        self.telnet.clear()
+        self.servers.clear()
         self.gateways.clear()
 
     async def apply_config(self, config: GatewayConfig, persist: bool = True) -> None:
@@ -58,10 +59,21 @@ class Runtime:
 
     async def _start_channels(self, config: GatewayConfig) -> None:
         for port in config.ports:
-            gateway = SerialGateway(port, self.broadcast)
-            server = TelnetServer(gateway.send)
+            gateway = SerialGateway(
+                port,
+                self.broadcast,
+                lambda data, port_id=port.id: self.broadcast_raw(port_id, data),
+            )
+            server = (
+                RawTcpServer(
+                    gateway.send_bytes,
+                    gateway.apply_serial_settings if port.usr_vcom_sync else None,
+                )
+                if port.network_protocol == "raw_tcp"
+                else TelnetServer(gateway.send)
+            )
             self.gateways[port.id] = gateway
-            self.telnet[port.id] = server
+            self.servers[port.id] = server
             await gateway.start()
             await server.start(port=port.telnet_port)
 
@@ -83,9 +95,9 @@ class Runtime:
         return gateway
 
     async def broadcast(self, event: dict) -> None:
-        telnet = self.telnet.get(event["port_id"])
-        if telnet:
-            await telnet.broadcast(event)
+        server = self.servers.get(event["port_id"])
+        if isinstance(server, TelnetServer):
+            await server.broadcast(event)
         dead = []
         for websocket in tuple(self.websockets):
             try:
@@ -94,6 +106,11 @@ class Runtime:
                 dead.append(websocket)
         for websocket in dead:
             self.websockets.discard(websocket)
+
+    async def broadcast_raw(self, port_id: str, data: bytes) -> None:
+        server = self.servers.get(port_id)
+        if isinstance(server, RawTcpServer):
+            await server.broadcast(data)
 
 
 runtime = Runtime()
@@ -186,7 +203,7 @@ async def put_settings(config: GatewayConfig, _: str = Depends(require_user)):
     try:
         await runtime.apply_config(config)
     except OSError as exc:
-        raise HTTPException(status_code=409, detail=f"Telnet 端口监听失败：{exc}") from exc
+        raise HTTPException(status_code=409, detail=f"网络端口监听失败：{exc}") from exc
     return runtime.config
 
 
@@ -198,7 +215,7 @@ async def status(_: str = Depends(require_user)):
             enabled=port.enabled,
             serial_connected=runtime.gateways[port.id].connected,
             simulated=port.simulated,
-            telnet_clients=len(runtime.telnet[port.id].clients),
+            telnet_clients=len(runtime.servers[port.id].clients),
             last_error=runtime.gateways[port.id].last_error,
         )
         for port in runtime.config.ports

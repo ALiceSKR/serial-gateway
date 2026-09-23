@@ -1,13 +1,14 @@
 # AI Shared Serial Gateway
 
-一个面向人工与 AI Agent 的多串口共享网关。每个硬件串口拥有独立的 Telnet 端口，同时支持网页终端、REST API、实时日志与在线修改串口参数。
+一个面向人工与 AI Agent 的多串口共享网关。每个硬件串口拥有独立的网络端口，可按通道选择 Telnet 或裸 TCP，同时支持网页终端、REST API、实时日志与在线修改串口参数。
 
 ## 当前雏形
 
 - Vue 3 登录页、通道管理和 xterm 交互式串口终端
 - FastAPI 单用户 Cookie 会话认证
-- 多串口通道；每条通道可配置名称、设备、波特率、数据位、校验位、停止位和 Telnet 端口
+- 多串口通道；每条通道可配置名称、设备、串口参数、网络模式和端口
 - SecureCRT Telnet 基础协商兼容
+- 裸 TCP 字节透明模式，可映射为 Windows 虚拟 COM 口；可选解析有人类 RFC2217 控制帧并自动同步串口参数
 - WebSocket 逐键双向传输，支持 Tab 补全、方向键、Ctrl+C 和 ANSI 颜色
 - 网页终端与 SecureCRT 共享同一串口，终端数据保持透明、不插入额外标记
 - 配置和日志持久化到 `data/`
