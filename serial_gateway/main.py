@@ -216,6 +216,10 @@ async def status(_: str = Depends(require_user)):
             serial_connected=runtime.gateways[port.id].connected,
             simulated=port.simulated,
             telnet_clients=len(runtime.servers[port.id].clients),
+            baudrate=runtime.gateways[port.id].settings.baudrate,
+            bytesize=runtime.gateways[port.id].settings.bytesize,
+            parity=runtime.gateways[port.id].settings.parity,
+            stopbits=runtime.gateways[port.id].settings.stopbits,
             last_error=runtime.gateways[port.id].last_error,
         )
         for port in runtime.config.ports

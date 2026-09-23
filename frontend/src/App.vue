@@ -29,6 +29,12 @@ const terminalHistory = new Map()
 const selected = computed(() => config.ports.find(port => port.id === selectedId.value) || config.ports[0] || {})
 const currentStatus = computed(() => statuses.value.find(item => item.port_id === selectedId.value) || {})
 const connectionLabel = computed(() => !currentStatus.value.enabled ? 'CLOSED' : currentStatus.value.serial_connected ? 'ONLINE' : 'OFFLINE')
+const currentSerialFormat = computed(() => ({
+  baudrate: currentStatus.value.baudrate ?? selected.value.baudrate,
+  bytesize: currentStatus.value.bytesize ?? selected.value.bytesize,
+  parity: currentStatus.value.parity ?? selected.value.parity,
+  stopbits: currentStatus.value.stopbits ?? selected.value.stopbits,
+}))
 const baudrates = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 1000000, 1500000, 2000000, 3000000, 4000000]
 
 async function api(path, options = {}) {
@@ -38,6 +44,7 @@ async function api(path, options = {}) {
     ...options,
   })
   if (response.status === 401) {
+    clearInterval(statusTimer)
     disconnectSocket()
     destroyTerminal()
     user.value = null
@@ -66,6 +73,7 @@ async function login() {
 async function logout() {
   await api('/api/logout', { method: 'POST' }).catch(() => {})
   disconnectSocket()
+  clearInterval(statusTimer)
   destroyTerminal()
   user.value = null
 }
@@ -159,7 +167,6 @@ function disconnectSocket() {
     socket.close()
     socket = null
   }
-  clearInterval(statusTimer)
 }
 
 function destroyTerminal() {
@@ -274,6 +281,7 @@ watch(selectedId, async (newId, oldId) => {
 
 onBeforeUnmount(() => {
   disconnectSocket()
+  clearInterval(statusTimer)
   destroyTerminal()
 })
 </script>
@@ -314,7 +322,7 @@ onBeforeUnmount(() => {
     <div class="workspace">
       <section class="overview">
         <div><span class="label">ACTIVE DEVICE</span><strong>{{ selected.device }}</strong></div>
-        <div><span class="label">SERIAL FORMAT</span><strong>{{ selected.baudrate }} · {{ selected.bytesize }}{{ selected.parity }}{{ selected.stopbits }}</strong></div>
+        <div><span class="label">SERIAL FORMAT</span><strong>{{ currentSerialFormat.baudrate }} · {{ currentSerialFormat.bytesize }}{{ currentSerialFormat.parity }}{{ currentSerialFormat.stopbits }}</strong></div>
         <div><span class="label">NETWORK ENDPOINT</span><strong>{{ hostname }}:{{ selected.telnet_port }} · {{ selected.network_protocol === 'raw_tcp' ? 'RAW TCP' : 'TELNET' }}</strong></div>
         <div><span class="label">CONNECTED CLIENTS</span><strong>{{ currentStatus.telnet_clients || 0 }} {{ selected.network_protocol === 'raw_tcp' ? 'TCP' : 'Telnet' }} · 1 Web</strong></div>
       </section>

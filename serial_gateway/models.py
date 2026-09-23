@@ -62,6 +62,10 @@ class GatewayStatus(BaseModel):
     serial_connected: bool
     simulated: bool
     telnet_clients: int
+    baudrate: int
+    bytesize: int
+    parity: Literal["N", "E", "O", "M", "S"]
+    stopbits: Literal[1, 1.5, 2]
     last_error: str | None = None
 
 
